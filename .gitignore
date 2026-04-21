@@ -58,3 +58,4 @@ nunit-*.xml
 [Oo]bj/
 *.user
 *.suo
+/CarManagerProject/CarManagerProject/CarDatabase_log.ldf
