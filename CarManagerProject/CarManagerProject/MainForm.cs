@@ -114,5 +114,16 @@ Integrated Security=True;";
                 }
             }
         }
+
+        private void dataGridView1_CellDoubleClick(object sender, DataGridViewCellEventArgs e)
+        {
+            if (dataGridView1.CurrentRow != null)
+            {
+                string brandName = dataGridView1.CurrentRow.Cells["brand_name"].Value.ToString();
+
+                DetailsForm form = new DetailsForm(brandName);
+                form.Show();
+            }
+        }
     }
 }
