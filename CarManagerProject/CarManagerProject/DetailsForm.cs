@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Data;
 using System.Drawing;
+using System.IO;
 using System.Windows.Forms;
 using Microsoft.Data.SqlClient;
 
@@ -8,13 +9,11 @@ namespace CarManagerProject
 {
     public partial class DetailsForm : Form
     {
-        string connectionString =
-@"Data Source=(LocalDB)\MSSQLLocalDB;
-AttachDbFilename=D:\Prodjects\CarManagerProject\CarManagerProject\CarDatabase.mdf;
-Integrated Security=True;";
+        string connectionString;
         public DetailsForm(string brandName)
         {
             InitializeComponent();
+            connectionString = DbInitializer.ConnectionString;
 
             LoadBrandDetails(brandName);
             LoadModels(brandName);
@@ -92,14 +91,15 @@ WHERE b.brand_name = @name";
                dataGridView1.CurrentRow.Cells["car_photo_img"].Value != null)
             {
                 string fileName = dataGridView1.CurrentRow.Cells["car_photo_img"].Value.ToString();
+                string normalizedFileName = fileName.Replace('/', '\\');
+                string path = Path.Combine(Application.StartupPath, normalizedFileName);
 
-                string path = System.IO.Path.Combine(
-                    Application.StartupPath,
-                    "Images",
-                    fileName
-                );
+                if (!File.Exists(path))
+                {
+                    path = Path.Combine(Application.StartupPath, "Images", Path.GetFileName(normalizedFileName));
+                }
 
-                if (System.IO.File.Exists(path))
+                if (File.Exists(path))
                 {
                     pictureBox1.Image = Image.FromFile(path);
                 }

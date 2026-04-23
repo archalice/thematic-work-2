@@ -1,27 +1,26 @@
-﻿using System;
-using Microsoft.Data.SqlClient;
+﻿using Microsoft.Data.SqlClient;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
 using System.Drawing;
 using System.Linq;
+using System.Net.NetworkInformation;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
-using System.Net.NetworkInformation;
 using static System.Windows.Forms.VisualStyles.VisualStyleElement;
 
 namespace CarManagerProject
 {
+
     public partial class MainForm : Form
     {
-        string connectionString =
-@"Data Source=(LocalDB)\MSSQLLocalDB;
-AttachDbFilename=D:\Prodjects\CarManagerProject\CarManagerProject\CarDatabase.mdf;
-Integrated Security=True;";
+        string connectionString;
         public MainForm()
         {
             InitializeComponent();
+            connectionString = DbInitializer.ConnectionString;
         }
 
         private void button1_Click(object sender, EventArgs e)

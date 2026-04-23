@@ -16,6 +16,7 @@ namespace CarManagerProject
         {
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
+            DbInitializer.EnsureDatabase();
             Application.Run(new MainForm());
         }
     }
