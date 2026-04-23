@@ -22,24 +22,45 @@ namespace CarManagerProject
 
         internal static void EnsureDatabase()
         {
+            string dbFilePath = GetDatabaseFilePath();
+            string logFilePath = GetLogFilePath();
+
             using (SqlConnection masterConnection = new SqlConnection(MasterConnectionString))
             {
                 masterConnection.Open();
 
-                SqlCommand databaseExistsCommand = new SqlCommand(
-                    "SELECT CASE WHEN DB_ID(N'CarDatabase') IS NULL THEN 0 ELSE 1 END;",
+                SqlCommand currentDatabasePathCommand = new SqlCommand(
+                    @"SELECT TOP 1 physical_name
+FROM sys.master_files
+WHERE database_id = DB_ID(N'CarDatabase')
+  AND file_id = 1;",
                     masterConnection);
 
-                bool databaseExists = (int)databaseExistsCommand.ExecuteScalar() == 1;
+                string currentDatabasePath = currentDatabasePathCommand.ExecuteScalar() as string;
+                bool databaseExists = !string.IsNullOrWhiteSpace(currentDatabasePath);
+
+                if (databaseExists && !File.Exists(currentDatabasePath))
+                {
+                    DropDatabase(masterConnection);
+                    databaseExists = false;
+                }
+                else if (databaseExists && !PathsMatch(currentDatabasePath, dbFilePath))
+                {
+                    return;
+                }
 
                 if (!databaseExists)
                 {
-                    SqlCommand createDatabaseCommand = new SqlCommand(
-                        "CREATE DATABASE [CarDatabase];",
-                        masterConnection);
-
-                    createDatabaseCommand.ExecuteNonQuery();
+                    if (File.Exists(dbFilePath))
+                    {
+                        AttachDatabase(masterConnection, dbFilePath, logFilePath);
+                    }
+                    else
+                    {
+                        CreateDatabase(masterConnection, dbFilePath, logFilePath);
+                    }
                 }
+
             }
 
             using (SqlConnection appConnection = new SqlConnection(ConnectionString))
@@ -81,6 +102,92 @@ namespace CarManagerProject
                     scriptCommand.ExecuteNonQuery();
                 }
             }
+        }
+
+        private static void AttachDatabase(SqlConnection masterConnection, string dbFilePath, string logFilePath)
+        {
+            string escapedDbFilePath = dbFilePath.Replace("'", "''");
+            string escapedLogFilePath = logFilePath.Replace("'", "''");
+            string attachCommandText;
+
+            if (File.Exists(logFilePath))
+            {
+                attachCommandText =
+                    $@"CREATE DATABASE [{DatabaseName}]
+ON
+(FILENAME = N'{escapedDbFilePath}'),
+(FILENAME = N'{escapedLogFilePath}')
+FOR ATTACH;";
+            }
+            else
+            {
+                attachCommandText =
+                    $@"CREATE DATABASE [{DatabaseName}]
+ON
+(FILENAME = N'{escapedDbFilePath}')
+FOR ATTACH_REBUILD_LOG;";
+            }
+
+            SqlCommand attachCommand = new SqlCommand(attachCommandText, masterConnection);
+            attachCommand.ExecuteNonQuery();
+        }
+
+        private static void CreateDatabase(SqlConnection masterConnection, string dbFilePath, string logFilePath)
+        {
+            string escapedDbFilePath = dbFilePath.Replace("'", "''");
+            string escapedLogFilePath = logFilePath.Replace("'", "''");
+
+            SqlCommand createCommand = new SqlCommand(
+                $@"CREATE DATABASE [{DatabaseName}]
+ON PRIMARY
+(NAME = N'{DatabaseName}', FILENAME = N'{escapedDbFilePath}')
+LOG ON
+(NAME = N'{DatabaseName}_log', FILENAME = N'{escapedLogFilePath}');",
+                masterConnection);
+
+            createCommand.ExecuteNonQuery();
+        }
+
+        private static void DropDatabase(SqlConnection masterConnection)
+        {
+            SqlCommand dropCommand = new SqlCommand(
+                @"IF DB_ID(N'CarDatabase') IS NOT NULL
+BEGIN
+    BEGIN TRY
+        ALTER DATABASE [CarDatabase] SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
+    END TRY
+    BEGIN CATCH
+    END CATCH
+
+    DROP DATABASE [CarDatabase];
+END",
+                masterConnection);
+
+            dropCommand.ExecuteNonQuery();
+        }
+
+        private static bool PathsMatch(string left, string right)
+        {
+            string normalizedLeft = Path.GetFullPath(left)
+                .TrimEnd(Path.DirectorySeparatorChar)
+                .ToUpperInvariant();
+            string normalizedRight = Path.GetFullPath(right)
+                .TrimEnd(Path.DirectorySeparatorChar)
+                .ToUpperInvariant();
+
+            return normalizedLeft == normalizedRight;
+        }
+
+        private static string GetDatabaseFilePath()
+        {
+            return Path.GetFullPath(
+                Path.Combine(Application.StartupPath, @"..\..\CarDatabase.mdf"));
+        }
+
+        private static string GetLogFilePath()
+        {
+            return Path.GetFullPath(
+                Path.Combine(Application.StartupPath, @"..\..\CarDatabase_log.ldf"));
         }
     }
 }
