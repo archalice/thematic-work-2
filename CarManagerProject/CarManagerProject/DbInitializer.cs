@@ -29,14 +29,7 @@ namespace CarManagerProject
             {
                 masterConnection.Open();
 
-                SqlCommand currentDatabasePathCommand = new SqlCommand(
-                    @"SELECT TOP 1 physical_name
-FROM sys.master_files
-WHERE database_id = DB_ID(N'CarDatabase')
-  AND file_id = 1;",
-                    masterConnection);
-
-                string currentDatabasePath = currentDatabasePathCommand.ExecuteScalar() as string;
+                string currentDatabasePath = GetCurrentDatabasePath(masterConnection);
                 bool databaseExists = !string.IsNullOrWhiteSpace(currentDatabasePath);
 
                 if (databaseExists && !File.Exists(currentDatabasePath))
@@ -44,12 +37,22 @@ WHERE database_id = DB_ID(N'CarDatabase')
                     DropDatabase(masterConnection);
                     databaseExists = false;
                 }
-                else if (databaseExists && !PathsMatch(currentDatabasePath, dbFilePath))
+                else if (databaseExists && PathsMatch(currentDatabasePath, dbFilePath))
                 {
+                    // The expected project database is already attached.
+                }
+                else if (databaseExists && File.Exists(dbFilePath))
+                {
+                    // Prefer the project database file when it exists locally.
+                    DropDatabase(masterConnection);
+                    AttachDatabase(masterConnection, dbFilePath, logFilePath);
+                }
+                else if (databaseExists)
+                {
+                    // Preserve an existing working database from another path.
                     return;
                 }
-
-                if (!databaseExists)
+                else
                 {
                     if (File.Exists(dbFilePath))
                     {
@@ -102,6 +105,18 @@ WHERE database_id = DB_ID(N'CarDatabase')
                     scriptCommand.ExecuteNonQuery();
                 }
             }
+        }
+
+        private static string GetCurrentDatabasePath(SqlConnection masterConnection)
+        {
+            SqlCommand currentDatabasePathCommand = new SqlCommand(
+                @"SELECT TOP 1 physical_name
+FROM sys.master_files
+WHERE database_id = DB_ID(N'CarDatabase')
+  AND file_id = 1;",
+                masterConnection);
+
+            return currentDatabasePathCommand.ExecuteScalar() as string;
         }
 
         private static void AttachDatabase(SqlConnection masterConnection, string dbFilePath, string logFilePath)
